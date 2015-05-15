@@ -1,0 +1,200 @@
+#!/bin/bash
+# Script to configure DevLin OS either doing first login
+# (i.e. if not configured) or while manual invocation
+#
+# Check for manual invocation/login execution is done by
+# the argument of invocation.
+# Any argument - login execution
+# No argument  - Manual invocation
+#
+#
+# Package management script + Login splash + User Control in "DevLin OS"
+#
+
+mark_update() {
+if [ "$(grep $@ '/sources/devlinsofts.list' | awk '{print $3}')" = '0' ]
+then	# Set marked in devlinsofts.list
+	sed -i '/'$@'/ s/ 0 / 1 /' /sources/devlinsofts.list
+	echo -e "\033[0;32m"$(grep $@ '/sources/devlinsofts.list' | awk '{print $2}')"\033[0m" marked for Installation\
+/Uninstallation.
+	sleep 1
+else	# Already set
+	echo -e "\033[0;32m"$(grep $@ '/sources/devlinsofts.list' | awk '{print $2}')"\033[0m" is unmarked.
+	sed -i '/'$@'/ s/ 1 / 0 /' /sources/devlinsofts.list
+	sleep 1
+fi
+}
+
+show_splash() {
+clear
+echo -e "\033[0;32m"
+cat /etc/devlinsplash
+echo -e "\033[0m"
+sleep 10
+clear
+}
+
+source_download() {
+if $(grep $@ '/sources/devlinsources.list' | awk '{ print $2 }' | xargs wget -qc -P '/sources') ; then
+	echo -e "Downloaded \033[1;32m$@\033[0m"
+else 
+	echo -e "\033[1;32m$@\033[0m download failed."
+fi
+}
+
+source_install() {
+curdir=$(pwd)
+if $( ls -a '/sources' | grep -E .*\.tar\..*\|.*\.patch$ | grep -i $@ | xargs tar -xC /sources -f >> /sources/devlininstall.log 2>&1 ); then
+	cd $(echo /sources/$(ls -l '/sources' | grep -E '^d.*' | awk '{ print $9 }' | grep -i $@))
+	cat '/sources/devlininstallscripts' | grep -A 12 -i $(echo install-$@) | bash
+	bash $(echo install-$@.sh | tr '[A-Z]' '[a-z]') >> '/sources/devlininstall.log' 2>&1
+	sed -i '/'$@'/ s/0$/1/' '/sources/devlinsofts.list'
+	echo -e "Installed \033[1;32m$@\033[0m" && sleep 2
+	cd $curdir
+	rm -rf $(echo /sources/$(ls -l '/sources' | grep -E '^d.*' | awk '{ print $9 }' | grep -i $@))
+else
+	echo -e "\033[1;32m$@\033[0m install failed."
+fi
+}
+
+remove_app() {
+if $(eval echo $(grep -i $@ '/sources/devlinremovesofts.list' | awk '{ print $2 }') | xargs rm -rf); then
+	sed -i '/'$@'/ s/1$/0/' '/sources/devlinsofts.list'
+	echo -e "Removed \033[1;32m$@\033[0m"
+else
+	echo -e "\033[1;32m$@\033[0m remove failed. Some files may be left behind."
+fi
+}
+
+if [ ! -f '/sources/devlinsofts.list' -a ! -z "$1" ] || [ -z "$1" ]
+then	# DevLin Configuration
+
+	if [ ! -z "$1" ]; then
+	# Devlin Splash
+	show_splash
+	fi
+	if [ "$(id -u)" -eq 0 ]; then
+		if [ ! -f '/sources/devlinsofts.list' ]; then
+		# Create /sources/devlinsofts.list
+		echo -e "# Soft M I \n1. Links 0 0\n2. Mutt 0 0\n3. Git 0 0\n4. Python 0 0\n5. Ruby 0 0" > /sources/devlinsofts.list
+		# Clear all marked fields in /sources/devlinsofts.list
+		else sed -i 's/ 1 / 0 /' '/sources/devlinsofts.list'
+		fi
+		choice='a'
+		while [ ! "$choice" = '-1' ]
+		do
+			clear
+			case $choice in
+			"a"|"A")
+			echo -e "Choose the softwares to mark for installation: \n\n\033[1;31m1\033[0m. Utilities\n\033[1;31m2\
+\033[0m. Development tools\n\n   \033[1;32mI\033[0mNSTALL   E\033[1;32mX\033[0mIT\n"
+			read choice;;
+			"1")
+			echo -e "\t\033[1;34mUtilities\033[0m\n\n\033[1;31m3\033[0m. Links - Web Browser\n\033[1;31m4\033[0m.\
+ Mutt - Mail Client\n\n  \033[1;32mI\033[0mNSTALL   E\033[1;32mX\033[0mIT   B\033[1;32mA\033[0mCK\n"
+			read choice;;
+			"2")
+			echo -e "\t\033[1;34mDevelopment tools\033[0m\n\n\033[1;31m5\033[0m. Git - Version Control System\n\
+\033[1;31m6\033[0m. Python - High Level Language\n\033[1;31m7\033[0m. Ruby - High Level Language\n\n\
+ \033[1;32mI\033[0mNSTALL   E\033[1;32mX\033[0mIT   B\033[1;32mA\033[0mCK\n"
+			read choice;;
+			[3-7])
+			mark_update $(expr $choice - 2).
+			choice='a';;
+			"x"|"X") # Exit Option
+			echo -e "\033[1;31mDo you want to  exit? [y/n]"
+			read option
+			echo -e "\033[0m"
+			clear
+			if [ "$option" = 'y' -o "$option" = 'Y' ]; then
+				exit
+			else
+			choice='a'
+			fi;;
+			"i"|"I")
+			choice=-1;;
+			*)
+			for i in 5 4 3 2 1 ; do
+			clear
+			echo -e "\033[1;31mINVALID CHOICE!!!\033[0m\nRetry in \033[1;34m$i\033[0m" && sleep 1 ; done
+			choice='a';;
+			esac
+		done
+		for i in $(awk '{print $2}' '/sources/devlinsofts.list')
+		do
+			if [ "$(grep $i '/sources/devlinsofts.list' | awk '{print $3}')" = '1' ]; then
+				if [ "$(grep $i '/sources/devlinsofts.list' | awk '{print $4}' )" = '0' ]
+					then # Not Installed
+						echo -e "Downloading \033[1;32m$i\033[0m"
+						source_download $i
+				fi
+			fi
+		done
+		sleep 2
+		clear
+		for i in $(awk '{print $2}' '/sources/devlinsofts.list')
+		do
+			if [ "$(grep $i '/sources/devlinsofts.list' | awk '{print $3}')" = '1' ]; then
+				if [ "$(grep $i '/sources/devlinsofts.list' | awk '{print $4}' )" = '0' ]
+					then # Not Installed
+						echo -e "Installing \033[1;32m$i\033[0m"
+						source_install $i
+					else # Already Installed
+						echo -e "Removing \033[1;32m$i\033[0m"
+						remove_app $i
+				fi
+			fi
+		done
+		sleep 2
+		clear
+		echo -e "\033[1;36mDo you want to change root password? [y/n]"
+		read option
+		if [ $option = 'y' -o $option = 'Y' ]; then
+		passwd
+		fi
+		echo -e "\033[0m"
+		sleep 2
+		clear
+		if [ ! -z ${1:-''} ]; then
+			if [ -z "$(cat '/etc/group' | grep ^devlin | tr ':' ' ' | awk '{ print $1 }')" ]; then
+				groupadd devlin
+			fi
+			echo -e "\033[1;32m\tCreating new user:\n\nEnter new username: "
+			while [ "$(echo $usrname | tr '[A-Z]' '[a-z]')" = 'devlin' ] || [ -z $usrname ]
+			do
+				read usrname
+				if [ "$(echo $usrname | tr '[A-Z]' '[a-z]')" = 'devlin' ]; then
+					echo -e "\033[1;31mUsername cannot be DEVLIN\033[0m"
+				fi
+			done
+			useradd -s '/bin/bash' -g devlin -m -k '/dev/null' $usrname
+			echo -e "Set password for $usrname"
+			passwd $usrname
+			echo -e "\033[0m"
+			clear
+			echo -e "Added user \033[1;32m$usrname\033[0m"
+			sleep 2
+			clear
+		else
+			echo -e "\033[1;31mDo you want to remove user? [y/n]"
+			read option
+			clear
+			if [ "$option" = 'y' -o "$option" = 'Y' ]; then
+				echo -e "\033[1;32m\tRemoving existing user:\033[0m\n\nEnter username: "
+				read usrname
+				userdel -f $usrname
+				echo -e "\033[0m"
+				clear
+				echo -e "Removed user \033[1;32m$usrname\033[0m"
+				sleep 2
+				clear
+			fi
+			echo -e "\033[0m"
+		fi
+	else
+		echo -e "Should be run as \033[1;31mroot\033[0m. Execute as \033[1;33msu -c devlinconfig\033[0m"
+	fi
+else
+        # Devlin Splash Screen during login
+        show_splash
+fi

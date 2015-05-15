@@ -1,0 +1,66 @@
+cat > $(pwd)/install-python.sh << EOF
+./configure --prefix=/usr       \
+            --enable-shared     \
+            --enable-unicode=ucs4 &&
+make
+make install &&
+chmod -v 755 /usr/lib/libpython2.7.so.1.0
+EOF
+
+
+
+
+
+cat > $(pwd)/install-ruby.sh << EOF
+./configure --prefix=/usr --docdir=/usr/share/doc/ruby-2.1.0 --enable-shared &&
+make
+make install
+EOF
+
+
+
+
+
+
+
+
+cat > $(pwd)/install-git.sh << EOF
+./configure --prefix=/usr         \
+            --with-gitconfig=/etc/gitconfig &&
+make
+make install
+EOF
+
+
+
+
+
+
+
+cat > $(pwd)/install-mutt.sh << EOF
+groupadd -g 34 mail
+chgrp -v mail /var/mail
+./configure --prefix=/usr --sysconfdir=/etc \
+            --with-docdir=/usr/share/doc/mutt-1.5.22 \
+            --enable-pop --enable-imap \
+            --enable-hcache --without-qdbm \
+            --without-tokyocabinet \
+            --with-gdbm --without-bdb &&
+make
+make install
+EOF
+
+cat > $(pwd)/install-links.sh << EOF
+./configure --prefix=/usr --mandir=/usr/share/man &&
+make
+make install &&
+install -v -d -m755 /usr/share/doc/links-2.8 &&
+install -v -m644 doc/links_cal/* KEYS BRAILLE_HOWTO \
+    /usr/share/doc/links-2.8
+EOF
+
+
+
+
+
+
